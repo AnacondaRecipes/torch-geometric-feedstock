@@ -1,0 +1,83 @@
+{% set name = "torch-geometric" %}
+{% set version = "2.8.1" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.org/packages/source/{{ name[0] }}/{{ name }}/{{ name | replace('-', '_') }}-{{ version }}.tar.gz
+  sha256: 3d4431567fcf4865a29cfec25c52484382dd38fd46a45fb4f9d473545d64b812
+
+build:
+  number: 0
+  # py<310: upstream requires-python >=3.10 (pyproject.toml).
+  # osx-64: PyG 2.8 needs PyTorch >=2.9 (2.8.0 dropped PyTorch 2.8), and pytorch on
+  # pkgs/main stops at 2.6.0 for osx-64 because upstream PyTorch dropped x86_64 macOS.
+  skip: true  # [py<310 or (osx and x86_64)]
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python
+    - pip
+    - flit-core >=3.12,<4
+  run:
+    - python
+    - aiohttp
+    - fsspec
+    - jinja2
+    - numpy
+    - psutil >=5.8.0
+    - pyparsing
+    - requests
+    - tqdm
+    - python-xxhash
+    # Not declared in pyproject.toml (PyG installs torch out of band to pick a CUDA
+    # build), but `import torch_geometric` fails without it. PyG 2.8 supports PyTorch >=2.9.
+    - pytorch >=2.9  # analint: cbc_dep_in_run_missing_from_host  # pure Python; torch is not a build input
+  run_constrained:
+    # Bounded entries from pyproject.toml optional extras. Unbounded extras
+    # (yacs, pytorch-lightning, huggingface_hub, ...) are no-ops as constraints;
+    # dev/test/benchmark extras are omitted.
+    - protobuf <4.21  # graphgym extra
+    - captum <0.7.0  # full extra
+    - numba <0.60.0  # full extra
+
+test:
+  imports:
+    - torch_geometric
+    - torch_geometric.data
+    - torch_geometric.datasets
+    - torch_geometric.loader
+    - torch_geometric.nn
+    - torch_geometric.transforms
+    - torch_geometric.utils
+  requires:
+    - pip
+  commands:
+    - pip check
+    # The sdist ships no test suite; run one GCN message-passing forward pass instead.
+    - python -c "import torch; from torch_geometric.nn import GCNConv; ei = torch.tensor([[0, 1, 1, 2], [1, 0, 2, 1]]); out = GCNConv(16, 4)(torch.randn(3, 16), ei); assert out.shape == (3, 4), out.shape"
+
+about:
+  home: https://github.com/pyg-team/pytorch_geometric
+  summary: Graph Neural Network Library for PyTorch
+  description: |
+    PyG (PyTorch Geometric) is a library built upon PyTorch to easily write and
+    train Graph Neural Networks (GNNs) for a wide range of applications related
+    to structured data. It consists of various methods for deep learning on
+    graphs and other irregular structures, also known as geometric deep learning.
+    Basic PyG operations work without the optional native extensions (pyg-lib,
+    torch-scatter, torch-sparse), which are not included; features such as
+    neighbor sampling, SplineConv and the kNN/radius pooling operators require them.
+  license: MIT
+  license_family: MIT
+  license_file: LICENSE
+  doc_url: https://pytorch-geometric.readthedocs.io
+  dev_url: https://github.com/pyg-team/pytorch_geometric
+
+extra:
+  recipe-maintainers:
+    - danielnachun
+    - xkong-anaconda
